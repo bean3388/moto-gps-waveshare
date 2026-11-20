@@ -8,6 +8,7 @@ import { transformAmapRouteV2, transformAmapRouteOptionsV2 } from "../src/amap-t
 import { createMapTileProvider } from "../src/map-tiles.js";
 import fixture from "../fixtures/amap-route-v2.json";
 import { createR2Storage } from "./r2-storage.js";
+import { createGoogleProvider } from "../src/google-provider.js";
 
 // Workers only supports follow/manual. Preserve the Node provider's refusal to
 // follow redirects by inspecting the response instead of using redirect:"error".
@@ -45,6 +46,10 @@ function createApp(env) {
     if (typeof key !== "string" || !key.trim()) throw new Error("AMAP_WEB_SERVICE_KEY is required");
     provider = { ...createAmapProvider({ key }), ...createAmapPlacesProvider({ key }),
       ...createAmapCitiesProvider({ key }) };
+  } else if (mode === "google") {
+       const key = env.GOOGLE_MAPS_API_KEY;
+       if (typeof key !== "string" || !key.trim()) throw new Error("GOOGLE_MAPS_API_KEY is required");
+       provider = createGoogleProvider({ key });
   } else if (mode === "fixture") {
     provider = {
       async planRoute() { return transformAmapRouteV2(fixture, { generatedAtMs: Date.now() }); },
@@ -60,7 +65,7 @@ function createApp(env) {
     throw new Error("unsupported MOTO_PROVIDER");
   }
   // Fixture and disabled modes must stay offline even with the production 'auto' variable.
-  const mapUrl = mode === "amap" ? (env.MOTO_MAP_PMTILES_URL ?? "auto") : "disabled";
+  const mapUrl = (mode === "amap" || mode === "google") ? (env.MOTO_MAP_PMTILES_URL ?? "auto") : "disabled";
   if (mapUrl !== "disabled") createR2Storage(env.MAP_CACHE); // Validate the binding without I/O.
   function maps(ctx) {
     return createMapTileProvider({ url: mapUrl, scheduleRefresh: false, fetchImpl: mapFetch,

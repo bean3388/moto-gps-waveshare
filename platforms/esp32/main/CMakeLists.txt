@@ -51,3 +51,8 @@ target_compile_options(${COMPONENT_LIB} PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>
     $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
 )
+
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-pedantic -Wno-error)
+
+
+

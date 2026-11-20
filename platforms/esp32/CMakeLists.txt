@@ -40,3 +40,5 @@ endif()
 set(PROJECT_VER "0.2.1")
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(moto_gps_esp32)
+add_compile_options(-Wno-pedantic -Wno-error $<$<COMPILE_LANGUAGE:CXX>:-fpermissive>)
+

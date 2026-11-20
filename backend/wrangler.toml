@@ -1,0 +1,8 @@
+name = "moto-gps-gateway"
+main = "src/worker.js"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "MOTO_R2"
+bucket_name = "moto-gps-cache"

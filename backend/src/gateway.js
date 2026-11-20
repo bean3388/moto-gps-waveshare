@@ -171,11 +171,11 @@ export function createGateway({
         200,
         {
           status: "ok",
-          ready_for_live_navigation: providerMode === "amap",
-          provider: providerMode,
-          capabilities: {
-            route_planning: providerMode === "amap",
-            route_traffic: providerMode === "amap",
+          ready_for_live_navigation: providerMode === "amap" || providerMode === "google",
+     provider: providerMode,
+     capabilities: {
+       route_planning: providerMode === "amap" || providerMode === "google",
+       route_traffic: providerMode === "amap" || providerMode === "google",
             // Route Planning v2 exposes neither legal road speed limits nor
             // live signal phases. API readiness must not imply those feeds.
             road_speed_limits: false,
