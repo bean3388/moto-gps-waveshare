@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { wgs84ToGcj02 } from "./coordinates.js";
+import { validateCityKeywords } from "./amap-cities.js";
 
 const MAX_RESULTS = 12;
 const NEARBY_RADIUS_M = 50_000.0;
@@ -329,5 +330,94 @@ export function createGoogleProvider({
         places,
       };
     },
+          async searchCities({ keywords } = {}, { signal } = {}) {
+         const validated = validateCityKeywords(keywords);
+
+         const queryViewport = async (includedType) => {
+           const deadline = AbortSignal.timeout(timeoutMs);
+           const requestSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+
+           const body = {
+             textQuery: validated,
+             maxResultCount: 10,
+             ...(includedType ? { includedType } : {}),
+           };
+
+           let response;
+           try {
+             response = await fetchImpl("https://places.googleapis.com/v1/places:searchText", {
+               method: "POST",
+               headers: {
+                 "Content-Type": "application/json",
+                 "X-Goog-Api-Key": key,
+                 "X-Goog-FieldMask": [
+                   "places.id",
+                   "places.displayName",
+                   "places.formattedAddress",
+                   "places.viewport",
+                   "places.types",
+                 ].join(","),
+               },
+               body: JSON.stringify(body),
+               signal: requestSignal,
+             });
+           } catch {
+             throw new GoogleProviderError(
+               deadline.aborted ? "PROVIDER_TIMEOUT" : "PROVIDER_UNAVAILABLE",
+               "Google city search is unavailable",
+             );
+           }
+
+           if (!response.ok) {
+             throw new GoogleProviderError(
+               "PROVIDER_HTTP_ERROR",
+               `Google Places returned HTTP ${response.status}`,
+               { retryable: response.status >= 500 || response.status === 429 },
+             );
+           }
+
+           return await response.json();
+         };
+
+         // Search cities/towns ("locality") first; if empty (e.g., state or district), broaden search.
+         let data = await queryViewport("locality");
+         if (!Array.isArray(data.places) || data.places.length === 0) {
+           data = await queryViewport(null);
+         }
+
+         const cities = [];
+         const seen = new Set();
+
+         for (const p of Array.isArray(data.places) ? data.places : []) {
+           const id = compactText(p.id, 64);
+           const name = compactText(p.displayName?.text, 80);
+           const low = p.viewport?.low;
+           const high = p.viewport?.high;
+           if (!id || !name || seen.has(id) || !low || !high) continue;
+
+           const west = Number(low.longitude);
+           const south = Number(low.latitude);
+           const east = Number(high.longitude);
+           const north = Number(high.latitude);
+
+           if (
+             !Number.isFinite(west) || !Number.isFinite(south) ||
+             !Number.isFinite(east) || !Number.isFinite(north) ||
+             west >= east || south >= north
+           ) {
+             continue;
+           }
+
+           cities.push({
+             id,
+             name,
+             detail: compactText(p.formattedAddress, 80) || "City",
+             bounds_wgs84: [west, south, east, north],
+           });
+           seen.add(id);
+         }
+
+         return { cities };
+       },
   };
 }
